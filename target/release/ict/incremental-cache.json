@@ -1,0 +1,14 @@
+{
+  "packageInformation": {
+    "ict": {
+      "rootPackageName": "ict",
+      "fileNameHash": "-4051869664990281864",
+      "timeStamp": 1766886866,
+      "isBuilt": true,
+      "exeName": "main",
+      "hasSubPkgs": false
+    }
+  },
+  "jsonHash": "5812055900448321921",
+  "rootPackageName": "ict"
+}

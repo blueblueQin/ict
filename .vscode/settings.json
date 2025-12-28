@@ -1,0 +1,20 @@
+{
+    "terminal.integrated.env.linux": {
+        "CANGJIE_HOME": "/home/blue/cj/cangjie",
+        "CANGJIE_PATH": "/home/blue/cj/cangjie/bin:/home/blue/cj/cangjie/tools/bin:/home/blue/cj/cangjie/debugger/bin:/home/blue/.cjpm/bin",
+        "CANGJIE_LD_LIBRARY_PATH": "/home/blue/cj/cangjie/runtime/lib/linux_x86_64_llvm:/home/blue/cj/cangjie/tools/lib:",
+        "LD_LIBRARY_PATH": "${config:terminal.integrated.env.linux.CANGJIE_LD_LIBRARY_PATH}:${env:LD_LIBRARY_PATH}",
+        "PATH": "${config:terminal.integrated.env.linux.CANGJIE_PATH}:${env:PATH}"
+    },
+    "editor.gotoLocation.alternativeDeclarationCommand": "editor.action.revealDefinition",
+    "editor.gotoLocation.alternativeDefinitionCommand": "editor.action.revealDefinition",
+    "editor.gotoLocation.alternativeTypeDefinitionCommand": "editor.action.revealDefinition",
+    "editor.selectionHighlight": false,
+    "files.autoSave": "onFocusChange",
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.quickSuggestions": {
+        "other": "on",
+        "comments": "off",
+        "strings": "on"
+    }
+}
