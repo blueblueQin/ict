@@ -1,114 +1,87 @@
 import std.collection.*
 import std.sort.*
 
-struct StateResult {
-    init(
-        public var cost: Int64,
-        public var time: Int64
-    ) {}
-}
-
-
-public func solve(input: Array<(Rune, Int64)>): Int64 {
-    let totalItems = input.size
-    if (totalItems < 2) { return 0 }
+func solve(input: Array<(Rune, Int64)>): Int64 {
+    let n = input.size
+    if (n < 2) { return 0 }
     
-    var groupA = ArrayList<Int64>()
-    var groupB = ArrayList<Int64>()
-    var groupC = ArrayList<Int64>()
+    var groupL = ArrayList<Int64>()
+    var groupM = ArrayList<Int64>()
+    var groupH = ArrayList<Int64>()
     
-    for (i in 0..totalItems) {
-        let (category, val) = input[i]
-        match (category) {
-            case r'L' => groupA.add(val)
-            case r'M' => groupB.add(val)
-            case r'H' => groupC.add(val)
-            case _ => ()
-        }
+    for (i in 0..n) {
+        let (tag, val) = input[i]
+        // 仓颉支持 Rune 类型的比较操作 [6]
+        if (tag == r'L') { groupL.add(val) }
+        else if (tag == r'M') { groupM.add(val) }
+        else if (tag == r'H') { groupH.add(val) }
     }
     
-    sort(groupA)
-    sort(groupB)
-    sort(groupC)
+    sort(groupL)
+    sort(groupM)
+    sort(groupH)
     
-    let sizeA = groupA.size
-    let sizeB = groupB.size
-    let sizeC = groupC.size
+    let nL = groupL.size
+    let nM = groupM.size
+    let nH = groupH.size
     
-    // 转换至静态数组提升访问效率
-    let dataA = Array<Int64>(sizeA, { i => groupA[i] })
-    let dataB = Array<Int64>(sizeB, { i => groupB[i] })
-    let dataC = Array<Int64>(sizeC, { i => groupC[i] })
+    let itemsL = Array<Int64>(nL, { i => groupL[i] })
+    let itemsM = Array<Int64>(nM, { i => groupM[i] })
+    let itemsH = Array<Int64>(nH, { i => groupH[i] })
     
-    let gapMatrix = [[1, 1, 1], [2, 1, 1], [2, 2, 1]]
-    let INF: Int64 = Int64.Max / 2
+    let matrix = [[1, 1, 1], [2, 1, 1], [2, 2, 1]]
+    let INF: Int64 = Int64.Max / 2 // 防止加法溢出
     
-    let totalStates = (sizeA + 1) * (sizeB + 1) * (sizeC + 1) * 3
+    let totalStates = (nL + 1) * (nM + 1) * (nH + 1) * 3
     var dpCost = Array<Int64>(totalStates, { _ => INF })
     var dpTime = Array<Int64>(totalStates, { _ => INF })
     var dpCostAlt = Array<Int64>(totalStates, { _ => INF })
     var dpTimeAlt = Array<Int64>(totalStates, { _ => INF })
     
-    let getIdx = { a: Int64, b: Int64, c: Int64, last: Int64 =>
-        ((a * (sizeB + 1) + b) * (sizeC + 1) + c) * 3 + last
+    let getIdx = { i: Int64, j: Int64, k: Int64, last: Int64 =>
+        ((i * (nM + 1) + j) * (nH + 1) + k) * 3 + last
     }
     
-    if (sizeA > 0) { let i = getIdx(1, 0, 0, 0); dpCost[i] = 0; dpTime[i] = 0; dpCostAlt[i] = 0; dpTimeAlt[i] = 0 }
-    if (sizeB > 0) { let i = getIdx(0, 1, 0, 1); dpCost[i] = 0; dpTime[i] = 0; dpCostAlt[i] = 0; dpTimeAlt[i] = 0 }
-    if (sizeC > 0) { let i = getIdx(0, 0, 1, 2); dpCost[i] = 0; dpTime[i] = 0; dpCostAlt[i] = 0; dpTimeAlt[i] = 0 }
+    if (nL > 0) { let id = getIdx(1, 0, 0, 0); dpCost[id] = 0; dpTime[id] = 0; dpCostAlt[id] = 0; dpTimeAlt[id] = 0 }
+    if (nM > 0) { let id = getIdx(0, 1, 0, 1); dpCost[id] = 0; dpTime[id] = 0; dpCostAlt[id] = 0; dpTimeAlt[id] = 0 }
+    if (nH > 0) { let id = getIdx(0, 0, 1, 2); dpCost[id] = 0; dpTime[id] = 0; dpCostAlt[id] = 0; dpTimeAlt[id] = 0 }
     
-    for (a in 0..=sizeA) {
-        for (b in 0..=sizeB) {
-            for (c in 0..=sizeC) {
-                if (a + b + c == 0) { continue }
-                for (lastType in 0..3) {
-                    let currIdx = getIdx(a, b, c, lastType)
-                    if (dpCost[currIdx] == INF) { continue }
+    for (i in 0..=nL) {
+        for (j in 0..=nM) {
+            for (k in 0..=nH) {
+                if (i + j + k == 0) { continue }
+                for (last in 0..3) {
+                    let cur = getIdx(i, j, k, last)
+                    if (dpCost[cur] == INF) { continue }
                     
-                    let update = { targetA: Int64, targetB: Int64, targetC: Int64, nextType: Int64, baseC: Int64, baseT: Int64, limit: Int64 =>
-                        let nextIdx = getIdx(targetA, targetB, targetC, nextType)
-                        let nextT = baseT + gapMatrix[lastType][nextType]
-                        let wait = if (nextT > limit) { nextT - limit } else { 0 }
-                        let nextC = baseC + wait
+                    let update = { ni: Int64, nj: Int64, nk: Int64, nextT: Int64, baseC: Int64, baseT: Int64, limit: Int64 =>
+                        let nextIdx = getIdx(ni, nj, nk, nextT)
+                        let timeAt = baseT + matrix[last][nextT]
+                        let wait = if (timeAt > limit) { timeAt - limit } else { 0 }
+                        let costAt = baseC + wait
                         
-                        if (nextC < dpCost[nextIdx] || (nextC == dpCost[nextIdx] && nextT < dpTime[nextIdx])) {
-                            dpCost[nextIdx] = nextC
-                            dpTime[nextIdx] = nextT
+                        if (costAt < dpCost[nextIdx] || (costAt == dpCost[nextIdx] && timeAt < dpTime[nextIdx])) {
+                            dpCost[nextIdx] = costAt; dpTime[nextIdx] = timeAt
                         }
-                        if (nextT < dpTimeAlt[nextIdx] || (nextT == dpTimeAlt[nextIdx] && nextC < dpCostAlt[nextIdx])) {
-                            dpCostAlt[nextIdx] = nextC
-                            dpTimeAlt[nextIdx] = nextT
+                        if (timeAt < dpTimeAlt[nextIdx] || (timeAt == dpTimeAlt[nextIdx] && costAt < dpCostAlt[nextIdx])) {
+                            dpCostAlt[nextIdx] = costAt; dpTimeAlt[nextIdx] = timeAt
                         }
                     }
 
-                    if (a < sizeA) { 
-                        update(a + 1, b, c, 0, dpCost[currIdx], dpTime[currIdx], dataA[a])
-                        if (dpTimeAlt[currIdx] != dpTime[currIdx]) {
-                            update(a + 1, b, c, 0, dpCostAlt[currIdx], dpTimeAlt[currIdx], dataA[a])
-                        }
-                    }
-                    if (b < sizeB) { 
-                        update(a, b + 1, c, 1, dpCost[currIdx], dpTime[currIdx], dataB[b])
-                        if (dpTimeAlt[currIdx] != dpTime[currIdx]) {
-                            update(a, b + 1, c, 1, dpCostAlt[currIdx], dpTimeAlt[currIdx], dataB[b])
-                        }
-                    }
-                    if (c < sizeC) { 
-                        update(a, b, c + 1, 2, dpCost[currIdx], dpTime[currIdx], dataC[c])
-                        if (dpTimeAlt[currIdx] != dpTime[currIdx]) {
-                            update(a, b, c + 1, 2, dpCostAlt[currIdx], dpTimeAlt[currIdx], dataC[c])
-                        }
-                    }
+                    if (i < nL) { update(i + 1, j, k, 0, dpCost[cur], dpTime[cur], itemsL[i]) }
+                    if (j < nM) { update(i, j + 1, k, 1, dpCost[cur], dpTime[cur], itemsM[j]) }
+                    if (k < nH) { update(i, j, k + 1, 2, dpCost[cur], dpTime[cur], itemsH[k]) }
                 }
             }
         }
     }
-    
-    var finalMin = INF
-    for (t in 0..3) {
-        let lastIdx = getIdx(sizeA, sizeB, sizeC, t)
-        finalMin = min(finalMin, min(dpCost[lastIdx], dpCostAlt[lastIdx], [])) // 使用标准库 min 函数 [6]
+    var result = INF
+    let finalIdxBase = getIdx(nL, nM, nH, 0)
+    for (offset in 0..3) {
+        let idx = finalIdxBase + offset
+        if (dpCost[idx] < result) { result = dpCost[idx] }
+        if (dpCostAlt[idx] < result) { result = dpCostAlt[idx] }
     }
     
-    return finalMin
+    return result
 }
