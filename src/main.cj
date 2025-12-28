@@ -1,96 +1,114 @@
-package ict
 import std.collection.*
+import std.sort.*
 
-// 1. 使用 struct 封装汉字处理，利用 toRuneArray 确保索引准确 [3][5]
-struct VerseText {
-    let characters: Array<Rune>
-    let length: Int64
-
-    public init(raw: String) {
-        this.characters = raw.toRuneArray()
-        this.length = characters.size
-    }
-
-    // 利用重载运算符简化子串提取逻辑 [5]
-    operator func [](range: Range<Int64>): String {
-        return String(characters[range])
-    }
+struct StateResult {
+    init(
+        public var cost: Int64,
+        public var time: Int64
+    ) {}
 }
 
-// 2. 单词信息结构体，脱敏字段名称
-class WordEntry {
-    let key: Int64
-    let content: String
-    let charCount: Int64
+
+public func solve(input: Array<(Rune, Int64)>): Int64 {
+    let totalItems = input.size
+    if (totalItems < 2) { return 0 }
     
-    init(key: Int64, content: String, charCount: Int64) {
-        this.key = key
-        this.content = content
-        this.charCount = charCount
-    }
-}
-
-func solve(verse: String, words: Array<String>): Int64 {
-    let target = VerseText(verse)
-    let totalLen = target.length
-    if (totalLen == 0) { return 0 }
-
-    // 3. 词典预处理：去重并过滤无效长度单词 [3]
-    let dictMap = HashMap<String, Int64>()
-    let pool = ArrayList<WordEntry>()
-    var idGenerator: Int64 = 0
-
-    for (w in words) {
-        if (w.isEmpty()) { continue }
-        if (!dictMap.contains(w)) {
-            dictMap[w] = idGenerator
-            let r = w.toRuneArray()
-            if (r.size <= totalLen) {
-                pool.add(WordEntry(idGenerator, w, r.size))
-            }
-            idGenerator += 1
+    var groupA = ArrayList<Int64>()
+    var groupB = ArrayList<Int64>()
+    var groupC = ArrayList<Int64>()
+    
+    for (i in 0..totalItems) {
+        let (category, val) = input[i]
+        match (category) {
+            case r'L' => groupA.add(val)
+            case r'M' => groupB.add(val)
+            case r'H' => groupC.add(val)
+            case _ => ()
         }
     }
     
-    let uniqueSize = idGenerator
-    // 状态记录：[最小单词种类, 达成该种类的路径数]
-    var finalResult = [Int64.Max, 0]
+    sort(groupA)
+    sort(groupB)
+    sort(groupC)
+    
+    let sizeA = groupA.size
+    let sizeB = groupB.size
+    let sizeC = groupC.size
+    
+    // 转换至静态数组提升访问效率
+    let dataA = Array<Int64>(sizeA, { i => groupA[i] })
+    let dataB = Array<Int64>(sizeB, { i => groupB[i] })
+    let dataC = Array<Int64>(sizeC, { i => groupC[i] })
+    
+    let gapMatrix = [[1, 1, 1], [2, 1, 1], [2, 2, 1]]
+    let INF: Int64 = Int64.Max / 2
+    
+    let totalStates = (sizeA + 1) * (sizeB + 1) * (sizeC + 1) * 3
+    var dpCost = Array<Int64>(totalStates, { _ => INF })
+    var dpTime = Array<Int64>(totalStates, { _ => INF })
+    var dpCostAlt = Array<Int64>(totalStates, { _ => INF })
+    var dpTimeAlt = Array<Int64>(totalStates, { _ => INF })
+    
+    let getIdx = { a: Int64, b: Int64, c: Int64, last: Int64 =>
+        ((a * (sizeB + 1) + b) * (sizeC + 1) + c) * 3 + last
+    }
+    
+    if (sizeA > 0) { let i = getIdx(1, 0, 0, 0); dpCost[i] = 0; dpTime[i] = 0; dpCostAlt[i] = 0; dpTimeAlt[i] = 0 }
+    if (sizeB > 0) { let i = getIdx(0, 1, 0, 1); dpCost[i] = 0; dpTime[i] = 0; dpCostAlt[i] = 0; dpTimeAlt[i] = 0 }
+    if (sizeC > 0) { let i = getIdx(0, 0, 1, 2); dpCost[i] = 0; dpTime[i] = 0; dpCostAlt[i] = 0; dpTimeAlt[i] = 0 }
+    
+    for (a in 0..=sizeA) {
+        for (b in 0..=sizeB) {
+            for (c in 0..=sizeC) {
+                if (a + b + c == 0) { continue }
+                for (lastType in 0..3) {
+                    let currIdx = getIdx(a, b, c, lastType)
+                    if (dpCost[currIdx] == INF) { continue }
+                    
+                    let update = { targetA: Int64, targetB: Int64, targetC: Int64, nextType: Int64, baseC: Int64, baseT: Int64, limit: Int64 =>
+                        let nextIdx = getIdx(targetA, targetB, targetC, nextType)
+                        let nextT = baseT + gapMatrix[lastType][nextType]
+                        let wait = if (nextT > limit) { nextT - limit } else { 0 }
+                        let nextC = baseC + wait
+                        
+                        if (nextC < dpCost[nextIdx] || (nextC == dpCost[nextIdx] && nextT < dpTime[nextIdx])) {
+                            dpCost[nextIdx] = nextC
+                            dpTime[nextIdx] = nextT
+                        }
+                        if (nextT < dpTimeAlt[nextIdx] || (nextT == dpTimeAlt[nextIdx] && nextC < dpCostAlt[nextIdx])) {
+                            dpCostAlt[nextIdx] = nextC
+                            dpTimeAlt[nextIdx] = nextT
+                        }
+                    }
 
-    // 4. 定义递归搜索函数，显式标注返回类型 : Unit [6]
-    func search(pos: Int64, currentPath: ArrayList<Int64>): Unit {
-        if (pos == totalLen) {
-            // 统计路径中不重复单词的数量
-            let visited = Array<Bool>(uniqueSize, { _ => false }) 
-            var distCount: Int64 = 0
-            for (id in currentPath) {
-                if (!visited[id]) {
-                    visited[id] = true
-                    distCount += 1
+                    if (a < sizeA) { 
+                        update(a + 1, b, c, 0, dpCost[currIdx], dpTime[currIdx], dataA[a])
+                        if (dpTimeAlt[currIdx] != dpTime[currIdx]) {
+                            update(a + 1, b, c, 0, dpCostAlt[currIdx], dpTimeAlt[currIdx], dataA[a])
+                        }
+                    }
+                    if (b < sizeB) { 
+                        update(a, b + 1, c, 1, dpCost[currIdx], dpTime[currIdx], dataB[b])
+                        if (dpTimeAlt[currIdx] != dpTime[currIdx]) {
+                            update(a, b + 1, c, 1, dpCostAlt[currIdx], dpTimeAlt[currIdx], dataB[b])
+                        }
+                    }
+                    if (c < sizeC) { 
+                        update(a, b, c + 1, 2, dpCost[currIdx], dpTime[currIdx], dataC[c])
+                        if (dpTimeAlt[currIdx] != dpTime[currIdx]) {
+                            update(a, b, c + 1, 2, dpCostAlt[currIdx], dpTimeAlt[currIdx], dataC[c])
+                        }
+                    }
                 }
             }
-
-            // 更新全局最优解
-            if (distCount < finalResult[0]) {
-                finalResult[0] = distCount
-                finalResult[1] = 1
-            } else if (distCount == finalResult[0]) {
-                finalResult[1] += 1
-            }
-            return
-        }
-
-        for (entry in pool) {
-            let nextPos = pos + entry.charCount
-            if (nextPos <= totalLen && target[pos..nextPos] == entry.content) {
-                currentPath.add(entry.key)
-                search(nextPos, currentPath)
-                // 回溯：移除最后加入的元素 [4]
-                currentPath.remove(currentPath.size - 1..currentPath.size) 
-            }
         }
     }
-
-    search(0, ArrayList<Int64>())
-
-    return if (finalResult[0] == Int64.Max) { 0 } else { finalResult[1] }
+    
+    var finalMin = INF
+    for (t in 0..3) {
+        let lastIdx = getIdx(sizeA, sizeB, sizeC, t)
+        finalMin = min(finalMin, min(dpCost[lastIdx], dpCostAlt[lastIdx], [])) // 使用标准库 min 函数 [6]
+    }
+    
+    return finalMin
 }
